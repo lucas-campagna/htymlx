@@ -13,7 +13,7 @@ box:
 "#;
         let comps = Yaml::new().load_str(code).unwrap();
         let mut runtime = Runtime::new();
-        runtime.add_many(&comps);
+        runtime.add_many(comps);
         let res = runtime.call("box", None);
         print!("{}", res);
         // assert!(*res);
