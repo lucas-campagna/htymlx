@@ -1,3 +1,4 @@
+mod constants;
 mod apply;
 mod utils;
 mod runtime;
@@ -81,9 +82,9 @@ Card:
   class: card
   body:
     - from: h1
-      body: "$title"
+      body: $title
     - from: p
-      body: "$content"
+      body: $content
 "#,
         )
         .unwrap();
@@ -96,6 +97,36 @@ content: "This is the card content."
             )
             .unwrap();
         let component = parser.call("Card", &props).unwrap();
+        let html = component.to_html();
+        assert_eq!(
+            html,
+            r#"<div class="card"><h1>Card Title</h1><p>This is the card content.</p></div>"#
+        );
+    }
+    
+    #[test]
+    fn test_nested_implicit_components() {
+        let parser = Parser::parse(
+            r#"
+Card:
+  from: div
+  class: card
+  body:
+    - h1: $title
+  - p: $content
+"#,
+        )
+        .unwrap();
+        let props = rust_yaml::Yaml::new()
+            .load_str(
+                r#"
+title: "Card Title"
+content: "This is the card content."
+"#,
+            )
+            .unwrap();
+        let component = parser.call("Card", &props).unwrap();
+        println!("{:?}", component.to_json().to_string());
         let html = component.to_html();
         assert_eq!(
             html,

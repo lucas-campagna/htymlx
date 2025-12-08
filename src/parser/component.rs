@@ -1,5 +1,7 @@
 use rust_yaml::Value;
 
+use super::constants::IMPLICIT_HTML_COMPONENTS;
+
 pub struct Component(Value);
 
 impl Component {
@@ -15,26 +17,28 @@ impl Component {
         fn render(obj: &Value) -> String {
             match obj {
                 Value::Mapping(map) => {
-                    let from = map.get(&Value::String("from".to_string()));
-                    let body = map.get(&Value::String("body".to_string()));
+                    let mut from = map.get(&Value::String("from".to_string()));
+                    let mut body = map.get(&Value::String("body".to_string()));
                     let has_from = from.is_some();
                     let has_body = body.is_some();
                     let props = {
                         let mut result = Vec::new();
-                        for (k, v) in map {
-                            if k.is_string()
-                                && (has_from && k.as_str().unwrap().to_string() == "from"
-                                    || has_body && k.as_str().unwrap().to_string() == "body")
+                        for (key, value) in map {
+                            if !key.is_string() {
+                                continue;
+                            }
+                            let key_str = key.as_str().unwrap().to_string();
+                            if has_from && key_str == "from"
+                                || has_body && key_str == "body"
                             {
                                 continue;
                             }
-                            fn check_is_valid_type(k: &Value) -> bool {
-                                k.is_string() || k.is_bool() || k.is_number()
+                            if !has_body && !has_from && IMPLICIT_HTML_COMPONENTS.contains(&key_str.as_str()) {
+                                from = Some(key);
+                                body = Some(value);
+                                continue;
                             }
-                            let is_prop = check_is_valid_type(k) && check_is_valid_type(v);
-                            if is_prop {
-                                result.push(format!("{}=\"{}\"", render(k), render(v)).to_owned());
-                            }
+                            result.push(format!("{}=\"{}\"", key_str, render(value)).to_owned());
                         }
                         result
                     };
