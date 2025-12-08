@@ -73,7 +73,7 @@ pub fn apply_merge(target: &Value, source: &Value) -> Value {
             Value::Mapping(merged)
         },
         (_, Value::Null) => target.clone(),
-        (Value::Null, _) => Value::Null,
+        // (Value::Null, _) => Value::Null,
         _ => source.clone(),
     }
 }
