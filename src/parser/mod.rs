@@ -140,4 +140,25 @@ content: "This is the card content."
             r#"<div class="card"><h1>Card Title</h1><p>This is the card content.</p></div>"#
         );
     }
-}
+
+    #[test]
+    fn test_templated() {
+        let parser = Parser::parse(
+            r#"
+$Card:
+  body: test
+
+Card:
+  from: div
+  class: card
+"#,
+        )
+        .unwrap();
+        let component = parser.call("Card", &Value::Null).unwrap();
+        let html = component.to_html();
+        assert_eq!(
+            html,
+            r#"<div class="card">test</div>"#
+        );
+    }
+
