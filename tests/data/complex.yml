@@ -1,8 +1,8 @@
-$comp:
+$card:
   body:
     - h1: $title
     - p: $content
 
-comp:
+card:
   from: div
   class: card

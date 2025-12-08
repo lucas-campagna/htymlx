@@ -165,12 +165,12 @@ Card:
     fn test_nested_implicit_templated_components() {
         let components = Parser::parse(
             r#"
-$comp:
+$card:
   body:
     - h1: $title
     - p: $content
 
-comp:
+card:
   from: div
   class: card
 "#,
@@ -184,7 +184,7 @@ content: "This is the card content."
 "#,
             )
             .unwrap();
-        let component = components.call("comp", &props).unwrap();
+        let component = components.call("card", &props).unwrap();
         let html = component.to_html();
         assert_eq!(
             html,
