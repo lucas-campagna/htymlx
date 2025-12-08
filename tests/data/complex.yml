@@ -1,0 +1,8 @@
+$comp:
+  body:
+    - h1: $title
+    - p: $content
+
+comp:
+  from: div
+  class: card

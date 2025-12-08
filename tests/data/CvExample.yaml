@@ -1,0 +1,20 @@
+document:
+  - experience
+
+experience:
+  - h1: Professional Experience
+  - jobList
+
+$jobList:
+  from: div
+  body:
+    - h1: $title at $company
+    - span: $duration
+
+jobList:
+  - title: dev 1
+    company: company 1
+    duration: 2018-2020
+  - title: dev 2
+    company: company 2
+    duration: 2018-2020
