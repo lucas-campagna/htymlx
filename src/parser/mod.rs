@@ -6,7 +6,7 @@ mod component;
 
 use std::ops::Deref;
 use runtime::Runtime;
-use rust_yaml::{Error, Value};
+use rust_yaml::{Error, Value, Yaml};
 use component::Component;
 
 pub struct Parser(Value);
@@ -32,8 +32,14 @@ impl Parser {
     }
     pub fn call(&self, name: &str, props: &Value) -> Result<Component, Error> {
         let runtime = Runtime::new(&self.0);
-        let value = runtime.call(name, props)?;
+        let value = runtime.call(name, &mut props.clone())?;
         Ok(Component::new(value))
+    }
+    pub fn to_yaml(&self) -> Result<String, Error> {
+        Yaml::new().dump_str(self)
+    }
+    pub fn to_json(&self) -> String {
+        self.deref().to_string()
     }
 }
 
@@ -64,17 +70,15 @@ Link:
   from: a
   href: "$url"
   body: "$text"
-"#,
+"#
         )
         .unwrap();
-        let props = rust_yaml::Yaml::new()
-            .load_str(
+        let props = Parser::parse(
                 r#"
 url: "https://example.com"
 text: "Example"
-"#,
-            )
-            .unwrap();
+"#
+        ).unwrap();
         let component = parser.call("Link", &props).unwrap();
         let html = component.to_html();
         assert_eq!(html, r#"<a href="https://example.com">Example</a>"#);
@@ -95,8 +99,7 @@ Card:
 "#,
         )
         .unwrap();
-        let props = rust_yaml::Yaml::new()
-            .load_str(
+        let props = Parser::parse(
                 r#"
 title: "Card Title"
 content: "This is the card content."
@@ -120,12 +123,11 @@ Card:
   class: card
   body:
     - h1: $title
-  - p: $content
+    - p: $content
 "#,
         )
         .unwrap();
-        let props = rust_yaml::Yaml::new()
-            .load_str(
+        let props = Parser::parse(
                 r#"
 title: "Card Title"
 content: "This is the card content."
@@ -176,8 +178,7 @@ card:
 "#,
         )
         .unwrap();
-        let props = rust_yaml::Yaml::new()
-            .load_str(
+        let props = Parser::parse(
                 r#"
 title: "Card Title"
 content: "This is the card content."
