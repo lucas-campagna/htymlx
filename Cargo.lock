@@ -120,7 +120,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 [[package]]
 name = "rust-yaml"
 version = "0.0.5"
-source = "git+https://github.com/lucas-campagna/rust-yaml.git#905efb1f04c60e2d7329b596f404d8a2ac282324"
+source = "git+https://github.com/lucas-campagna/rust-yaml.git#a3bd8b9b8963413e912955b1151f6ce29bf6300f"
 dependencies = [
  "base64",
  "indexmap",
