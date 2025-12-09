@@ -1,0 +1,148 @@
+use super::*;
+
+#[test]
+fn test_simple_html() {
+    let parser = Parser::parse(
+        r#"
+Button:
+  from: button
+  type: submit
+  body: Click me!
+"#,
+    )
+    .unwrap();
+    eprintln!("parser {:}", parser.to_json());
+    let component = parser.call("Button", &Value::Null).unwrap();
+    let html = component.to_html();
+    assert_eq!(html, r#"<button type="submit">Click me!</button>"#);
+}
+
+#[test]
+fn test_html_with_props() {
+    let parser = Parser::parse(
+        r#"
+Link:
+  from: a
+  href: "$url"
+  body: "$text"
+"#
+    )
+    .unwrap();
+    let props = Parser::parse(
+            r#"
+url: "https://example.com"
+text: "Example"
+"#
+    ).unwrap();
+    let component = parser.call("Link", &props).unwrap();
+    let html = component.to_html();
+    assert_eq!(html, r#"<a href="https://example.com">Example</a>"#);
+}
+
+#[test]
+fn test_nested_components() {
+    let parser = Parser::parse(
+        r#"
+Card:
+  from: div
+  class: card
+  body:
+    - from: h1
+      body: $title
+    - from: p
+      body: $content
+"#,
+    )
+    .unwrap();
+    let props = Parser::parse(
+            r#"
+title: "Card Title"
+content: "This is the card content."
+"#,
+        )
+        .unwrap();
+    let component = parser.call("Card", &props).unwrap();
+    let html = component.to_html();
+    assert_eq!(
+        html,
+        r#"<div class="card"><h1>Card Title</h1><p>This is the card content.</p></div>"#
+    );
+}
+
+#[test]
+fn test_nested_implicit_components() {
+    let parser = Parser::parse(r#"
+Card:
+  from: div
+  class: card
+  body:
+    - h1: $title
+    - p: $content
+"#,
+    )
+    .unwrap();
+    let props = Parser::parse(
+            r#"
+title: "Card Title"
+content: "This is the card content."
+"#,
+        )
+        .unwrap();
+    let component = parser.call("Card", &props).unwrap();
+    let html = component.to_html();
+    assert_eq!(
+        html,
+        r#"<div class="card"><h1>Card Title</h1><p>This is the card content.</p></div>"#
+    );
+}
+
+#[test]
+fn test_templated() {
+    let parser = Parser::parse(
+        r#"
+$Card:
+  body: test
+
+Card:
+  from: div
+  class: card
+"#,
+    )
+    .unwrap();
+    let component = parser.call("Card", &Value::Null).unwrap();
+    let html = component.to_html();
+    assert_eq!(
+        html,
+        r#"<div class="card">test</div>"#
+    );
+}
+
+#[test]
+fn test_nested_implicit_templated_components() {
+    let components = Parser::parse(
+        r#"
+$card:
+  body:
+    - h1: $title
+    - p: $content
+
+card:
+  from: div
+  class: card
+"#,
+    )
+    .unwrap();
+    let props = Parser::parse(
+            r#"
+title: "Card Title"
+content: "This is the card content."
+"#,
+        )
+        .unwrap();
+    let component = components.call("card", &props).unwrap();
+    let html = component.to_html();
+    assert_eq!(
+        html,
+        r#"<div class="card"><h1>Card Title</h1><p>This is the card content.</p></div>"#
+    );
+}
