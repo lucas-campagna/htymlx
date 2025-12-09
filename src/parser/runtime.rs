@@ -19,12 +19,12 @@ impl Runtime<'_> {
         Runtime(value)
     }
 
-    fn call_template(&self, name: &str, props: &Value) -> Result<Value, Error> {
+    fn call_template(&self, name: &str, props: &mut Value) -> Result<Value, Error> {
         let name = &get_template_name(name);
         self.call(name.as_str(), props)
     }
 
-    pub fn call(&self, name: &str, props: &Value) -> Result<Value, Error> {
+    pub fn call(&self, name: &str, props: &mut Value) -> Result<Value, Error> {
         let is_template = is_template(name);
         let name = Value::String(name.into());
         let component = self.0.as_mapping().unwrap().get(&name);
@@ -39,23 +39,23 @@ impl Runtime<'_> {
         if component.is_none() && !has_template {
             return Ok(Value::Null);
         }
-        let component = component.unwrap_or(&Value::Null);
+        let mut component = component.unwrap_or(&Value::Null).clone();
         if is_template {
-            let mut component = apply(component, props);
+            apply(&mut component, props);
             self.parse_from(&mut component)?;
             self.parse_body(&mut component)?;
             if has_template {
-                return self.call_template(name.as_str().unwrap(), &component);
+                return self.call_template(name.as_str().unwrap(), &mut component);
             }
             Ok(component)
         } else {
-            let template = if has_template {
+            let mut template = if has_template {
                 self.call_template(name.as_str().unwrap(), props)?
             } else {
                 Value::Null
             };
-            let component = apply(&component, &template);
-            let mut component = apply(&component, props);
+            apply(&mut component, &mut template);
+            apply(&mut component, props);
             self.parse_from(&mut component)?;
             self.parse_body(&mut component)?;
             Ok(component)
@@ -71,7 +71,7 @@ impl Runtime<'_> {
             &&
             self.get_components().contains(from.as_str().unwrap())
         {
-            *value = self.call(from.as_str().unwrap(), value)?;
+            *value = self.call(from.as_str().unwrap(), &mut value.clone())?;
         }
         Ok(())
     }
@@ -90,7 +90,7 @@ impl Runtime<'_> {
                 match body {
                     Value::String(s) => {
                         if components.contains(s) {
-                            *value = runtime.call(s, &Value::Null)?;
+                            *value = runtime.call(s, &mut Value::Null)?;
                         }
                     }
                     Value::Sequence(values) => {

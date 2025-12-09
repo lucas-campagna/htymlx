@@ -18,16 +18,21 @@ pub fn get_props(comp: &Value) -> Vec<String> {
     }
 }
 
-pub fn apply_props(target: &Value, source: &Value) -> Value {
-    match (target, source) {
-        (Value::String(target_str), Value::Mapping(source_map)) => {
-            if source_map.keys().any(|k| {
+pub fn apply_props(target: &mut Value, source: &Value) {
+    let source_map = source.as_mapping().expect("Source should always be mapping!");
+    match target {
+        Value::String(target_str) => {
+            let get_prop_name = |prop: &str| String::from(&prop[1..]);
+            let has_prop_to_apply = source_map.keys().any(|k| {
                 match k {
-                    Value::String(s) => s == &target_str[1..],
+                    Value::String(s) => *s == get_prop_name(target_str),
                     _ => true,
                 }
-            }) && let Some(replacement) = source_map.get(&Value::String(target_str[1..].to_string())){
-                return replacement.clone();
+            });
+            let prop_value = source_map.get(&Value::String(get_prop_name(target_str)));
+            if has_prop_to_apply && let Some(replacement) = prop_value {
+                *target = replacement.clone();
+                return;
             }
             let result = VAR_RE.replace_all(target_str, |caps: &regex::Captures| {
                 let var_name = &caps[1];
@@ -38,47 +43,52 @@ pub fn apply_props(target: &Value, source: &Value) -> Value {
                     caps[0].to_string()
                 }
             });
-            Value::String(result.into_owned())
+            *target = Value::String(result.into_owned())
         }
-        (Value::Sequence(target_seq), Value::Mapping(_)) => {
-            let new_seq: Vec<Value> = target_seq
-                .iter()
-                .map(|item| apply_props(item, source))
-                .collect();
-            Value::Sequence(new_seq)
-        }
-        (Value::Mapping(target_map), Value::Mapping(_)) => {
-            let mut new_map = target_map.clone();
-            for (key, value) in target_map {
-                let new_value = apply_props(value, source);
-                new_map.insert(key.clone(), new_value);
+        target => {
+            if matches!(target, Value::Sequence(_)) {
+                target
+                    .as_sequence_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .for_each(|item| apply_props(item, source));
             }
-            Value::Mapping(new_map)
+            if matches!(target, Value::Mapping(_)) {
+                target
+                    .as_mapping_mut()
+                    .unwrap()
+                    .values_mut()
+                    .for_each(|value| apply_props(value, source));
+            }
         }
-        _ => target.clone(),
     }
 }
 
-pub fn apply_merge(target: &Value, source: &Value) -> Value {
+pub fn apply_merge(target: &mut Value, source: &Value) {
     match (target, source) {
-        (Value::Mapping(target_map), Value::Mapping(source_map)) => {
+        (target, Value::Mapping(source_map))
+        if matches!(target, Value::Mapping(..)) => {
+            let target_map = target.as_mapping().unwrap();
             let mut merged = target_map.clone();
-            for (key, source_value) in source_map {
+            for (key, source_value) in source_map.iter() {
                 if let Some(target_value) = merged.get(key) {
-                    merged.insert(key.clone(), apply_merge(target_value, source_value));
+                    let mut target_value = target_value.clone();
+                    apply_merge(&mut target_value, source_value);
+                    merged.insert(key.clone(), target_value);
                 } else {
                     merged.insert(key.clone(), source_value.clone());
                 }
             }
-            Value::Mapping(merged)
-        },
-        (_, Value::Null) => target.clone(),
-        // (Value::Null, _) => Value::Null,
-        _ => source.clone(),
+            *target = Value::Mapping(merged)
+        }
+        (_, Value::Null) => {}
+        (target, source) => {
+            *target = source.clone();
+        }
     }
 }
 
-pub fn apply(target: &Value, source: &Value) -> Value {
+pub fn apply(target: &mut Value, source: &mut Value) {
     let target_props: HashSet<String> = get_props(target).into_iter().collect();
     let source_props: HashSet<String> = match source {
         Value::Mapping(map) => map.keys().filter_map(|k| {
@@ -90,10 +100,15 @@ pub fn apply(target: &Value, source: &Value) -> Value {
         }).collect(),
         _ => vec![],
     }.into_iter().collect();
-    if target_props.intersection(&source_props).count() > 0 {
-        apply_props(target, source)
+    let common_props = target_props.intersection(&source_props);
+    if common_props.count() > 0 {
+        apply_props(target, source);
+        source
+            .as_mapping_mut()
+            .unwrap()
+            .retain(|k, _| !target_props.contains(k.as_str().unwrap()));
     } else {
-        apply_merge(target, source)
+        apply_merge(target, source);
     }
 }
 
@@ -138,9 +153,9 @@ item1: "Book"
 item2: "Pen"
 setting1: "Enabled"
 "#;
-        let target = Yaml::new().load_str(target_yaml).unwrap();
-        let source = Yaml::new().load_str(source_yaml).unwrap();
-        let result = apply(&target, &source);
+        let mut target = Yaml::new().load_str(target_yaml).unwrap();
+        let mut source = Yaml::new().load_str(source_yaml).unwrap();
+        apply(&mut target, &mut source);
         let expected_yaml = r#"
 message: "Hello, Alice!"
 items:
@@ -151,7 +166,7 @@ config:
   setting2: "Value without vars"
 "#;
         let expected = Yaml::new().load_str(expected_yaml).unwrap();
-        assert_eq!(result, expected);
+        assert_eq!(target, expected);
     }
 
     #[test]
@@ -164,15 +179,15 @@ user:
     first: "John"
     last: "Doe"
 "#;
-        let target = Yaml::new().load_str(target_yaml).unwrap();
-        let source = Yaml::new().load_str(source_yaml).unwrap();
-        let result = apply(&target, &source);
+        let mut target = Yaml::new().load_str(target_yaml).unwrap();
+        let mut source = Yaml::new().load_str(source_yaml).unwrap();
+        apply(&mut target, &mut source);
         let expected_yaml = r#"greeting:
     first: "John"
     last: "Doe"
 "#;
         let expected = Yaml::new().load_str(expected_yaml).unwrap();
-        assert_eq!(result, expected);
+        assert_eq!(target, expected);
     }
 
     #[test]
@@ -184,15 +199,15 @@ list:
 "#;
         let source_yaml = r#"name: "Bob"
 age: "30""#;
-        let target = Yaml::new().load_str(target_yaml).unwrap();
-        let source = Yaml::new().load_str(source_yaml).unwrap();
-        let result = apply(&target, &source);
+        let mut target = Yaml::new().load_str(target_yaml).unwrap();
+        let mut source = Yaml::new().load_str(source_yaml).unwrap();
+        apply(&mut target, &mut source);
         let expected_yaml = r#"list:
   - "Hello, Bob!"
   - "Your age is 30."
 "#;
         let expected = Yaml::new().load_str(expected_yaml).unwrap();
-        assert_eq!(result, expected);
+        assert_eq!(target, expected);
     }
     
     #[test]
@@ -203,15 +218,15 @@ list: $items
         let source_yaml = r#"items:
   - Item1
   - Item2"#;
-        let target = Yaml::new().load_str(target_yaml).unwrap();
-        let source = Yaml::new().load_str(source_yaml).unwrap();
-        let result = apply(&target, &source);
+        let mut target = Yaml::new().load_str(target_yaml).unwrap();
+        let mut source = Yaml::new().load_str(source_yaml).unwrap();
+        apply(&mut target, &mut source);
         let expected_yaml = r#"list:
   - Item1
   - Item2
 "#;
         let expected = Yaml::new().load_str(expected_yaml).unwrap();
-        assert_eq!(result, expected);
+        assert_eq!(target, expected);
     }
     
     #[test]
@@ -224,12 +239,12 @@ list:
         let source_yaml = r#"items:
   - Item1
   - Item2"#;
-        let target = Yaml::new().load_str(target_yaml).unwrap();
-        let source = Yaml::new().load_str(source_yaml).unwrap();
-        let result = apply(&target, &source);
+        let mut target = Yaml::new().load_str(target_yaml).unwrap();
+        let mut source = Yaml::new().load_str(source_yaml).unwrap();
+        apply(&mut target, &mut source);
         let expected_yaml = r#"list: [[Item1, Item2], [Item1, Item2]]"#;
         let expected = Yaml::new().load_str(expected_yaml).unwrap();
-        assert_eq!(result, expected);
+        assert_eq!(target, expected);
     }
     
     #[test]
@@ -244,9 +259,9 @@ config:
   setting2: "NewValue2"
   setting3: "Value3"
 "#;
-        let target = Yaml::new().load_str(target_yaml).unwrap();
-        let source = Yaml::new().load_str(source_yaml).unwrap();
-        let result = apply(&target, &source);
+        let mut target = Yaml::new().load_str(target_yaml).unwrap();
+        let mut source = Yaml::new().load_str(source_yaml).unwrap();
+        apply(&mut target, &mut source);
         let expected_yaml = r#"
 config:
   setting1: "Value1"
@@ -254,6 +269,6 @@ config:
   setting3: "Value3"
 "#;
         let expected = Yaml::new().load_str(expected_yaml).unwrap();
-        assert_eq!(result, expected);
+        assert_eq!(target, expected);
     }
 }
