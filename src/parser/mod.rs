@@ -44,4 +44,10 @@ impl Parser {
     pub fn to_json(&self) -> String {
         self.deref().to_string()
     }
+    pub fn to_component(&self) -> Component {
+        Component::new(self.to_value())
+    }
+    pub fn to_value(&self) -> Value {
+        self.deref().clone()
+    }
 }
