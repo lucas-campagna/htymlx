@@ -58,13 +58,7 @@ impl Runtime<'_> {
             eprintln!("Processing call to template {:?}", self.get_current_component_name());
             eprintln!("Before apply props {}", self.current_component);
             apply(&mut self.current_component, props);
-            eprintln!("Before parse shortcut {}", self.current_component);
-            self.parse_shortcut()?;
-            eprintln!("Before parse from {}", self.current_component);
-            self.parse_from()?;
-            eprintln!("Before parse body {}", self.current_component);
-            self.parse_composition()?;
-            eprintln!("Final {}", self.current_component);
+            self.parse_component()?;
             if has_template {
                 self.call_template()
             } else {
@@ -77,17 +71,22 @@ impl Runtime<'_> {
             }
             eprintln!("Before apply props {}", self.current_component);
             apply(&mut self.current_component, props);
-            eprintln!("Before parse shortcut {}", self.current_component);
-            self.parse_shortcut()?;
-            eprintln!("Before parse from {}", self.current_component);
-            self.parse_from()?;
-            eprintln!("Before parse body {}", self.current_component);
-            self.parse_composition()?;
-            eprintln!("Final {}", self.current_component);
+            self.parse_component()?;
             Ok(())
         }
     }
-
+    
+    /// Apply the shortcut, from and componsition parsers in the correct order
+    fn parse_component(&mut self) -> Result<(), Error> {
+        eprintln!("Before parse shortcut {}", self.current_component);
+        self.parse_shortcut()?;
+        eprintln!("Before parse from {}", self.current_component);
+        self.parse_from()?;
+        eprintln!("Before parse composition {}", self.current_component);
+        self.parse_composition()?;
+        eprintln!("Final {}", self.current_component);
+        Ok(())
+    }
     fn parse_from(&mut self) -> Result<(), Error> {
         if let Some(from) = self.current_component
             .as_mapping()
