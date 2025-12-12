@@ -202,10 +202,16 @@ impl Runtime<'_> {
                     Ok(result)
                 } else {
                     eprintln!("Do not has from");
-                    let mut result = IndexMap::with_capacity(index_map.len());
-                    for (key ,value) in index_map.drain(..) {
-                        result.insert(key ,self.parse_composition_value(value)?);
-                    }
+                    let result = index_map
+                        .into_iter()
+                        .map(|(key, value)| -> Result<(Value, Value), Error> {
+                            if key == Value::String("from".into()) {
+                                Ok((key, value))
+                            } else {
+                                Ok((key, self.parse_composition_value(value)?))
+                            }
+                        })
+                        .collect::<Result<IndexMap<Value, Value>, Error>>()?;
                     Ok(Value::Mapping(result))
                 }
             }
