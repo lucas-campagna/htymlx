@@ -87,6 +87,29 @@ impl Runtime<'_> {
         eprintln!("Final {}", self.current_component);
         Ok(())
     }
+
+    /// Any component with `from` property pointing to another valid component is a call to that component sending the other properties as parameter.
+    /// This function process this call.
+    /// Example:
+    /// 
+    /// ```yaml
+    /// app:
+    ///     from: my_button
+    ///     text: Hello World!
+    /// my_button:
+    ///     onclick: alert('clicked')
+    ///     body: $text
+    /// ```
+    /// 
+    /// After calling this function it will produces:
+    /// 
+    /// ```yaml
+    /// app:
+    ///     onclick: alert('clicked')
+    ///     body: Hello World!
+    /// ```
+    /// 
+    /// This is recursivelly applied from inner first
     fn parse_from(&mut self) -> Result<(), Error> {
         if let Some(from) = self.current_component
             .as_mapping()
@@ -101,6 +124,23 @@ impl Runtime<'_> {
         Ok(())
     }
 
+    /// This parses shortcuts for `from` and `body`
+    /// Example:
+    /// 
+    /// ```yaml
+    /// app:
+    ///     div: Hello World!
+    ///     prop: value
+    /// ```
+    /// 
+    /// This is a shortcut for
+    /// 
+    /// ```yaml
+    /// app:
+    ///     from: div
+    ///     body: Hello World!
+    ///     prop: value
+    /// ```
     fn parse_shortcut(&mut self) -> Result<(), Error> {
         if self.current_component.is_mapping() || self.current_component.is_sequence() {
             self.current_component = self.parse_shortcut_value(self.current_component.clone())?;
@@ -157,7 +197,16 @@ impl Runtime<'_> {
             value => Ok(value),
         }
     }
-
+    
+    /// Composition is the reference to one component inside another component
+    /// Example:
+    /// 
+    /// ```yaml
+    /// app: button
+    /// button: My Button
+    /// ```
+    /// 
+    /// `button` component is been refereced from `app`'s body
     fn parse_composition(&mut self) -> Result<(), Error> {
         self.current_component = self.parse_composition_value(self.current_component.clone())?;
         Ok(())
