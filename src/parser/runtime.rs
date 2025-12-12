@@ -119,14 +119,16 @@ impl Runtime<'_> {
 
     fn parse_from_value(&mut self, value: Value) -> Result<Value, Error> {
         match value {
-            Value::Sequence(mut value_seq) => {
+            Value::Sequence(value_seq) => {
                 eprintln!("Is Seq");
-                let mut result = Vec::with_capacity(value_seq.len());
-                for value in value_seq.drain(..) {
-                    result.push(self.parse_shortcut_value(value)?)
-                }
+                let result = value_seq
+                    .into_iter()
+                    .map(|value| {
+                        self.parse_from_value(value)
+                    })
+                    .collect::<Result<Vec<Value>, Error>>()?;
                 let result = Value::Sequence(result);
-                eprintln!("parse_shortcut_value Final: {}", result.to_string());
+                eprintln!("parse_from_value Final: {}", result.to_string());
                 Ok(result)
             }
             Value::Mapping(mut value_map) => {
