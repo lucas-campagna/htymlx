@@ -76,7 +76,7 @@ impl Runtime<'_> {
         }
     }
     
-    /// Apply the shortcut, from and componsition parsers in the correct order
+    /// Apply the `shortcut`, `from` and `composition` parsers in the correct order
     fn parse_component(&mut self) -> Result<(), Error> {
         eprintln!("Before parse shortcut {}", self.current_component);
         self.parse_shortcut()?;
